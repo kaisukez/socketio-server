@@ -22,6 +22,10 @@ app.get('/', (req, res) => {
   return res.send('hello world!')
 })
 
+app.get('/get_all_rooms', (req, res) => {
+  return roomList
+})
+
 io.on('connection', socket => {
   console.log(socket.id, 'connected')
   socketList[socket.id] = socket
