@@ -10,7 +10,7 @@ let usernameList = {}
 let roomList = {}
 let roomIndexNow = 0
 
-createRoom = roomHeaderSocket => {
+createRoom = roomHeaderSocketId => {
   roomIndexNow++
   const roomName = roomIndexNow.toString(36)
   const boardState = Array(8).fill('').map(a => Array(8).fill(false))
@@ -31,8 +31,15 @@ io.on('connection', socket => {
   socketList[socket.id] = socket
 
   socket.on('createRoom', () => {
+    console.log('createRoom')
     const roomName = createRoom(socket.id)
-    socket.boardcast.emit('roomCreated', { roomName })
+    io.emit('roomCreated', { roomName })
+  })
+
+  socket.on('reqRooms', () => {
+    console.log('reqRooms')
+    const rooms = Object.keys(roomList)
+    socket.emit('resRooms', { rooms })
   })
 
   socket.on('joinRoom', (roomName, username) => {
