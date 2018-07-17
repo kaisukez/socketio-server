@@ -6,7 +6,7 @@ const io = require('socket.io').listen(server)
 // const io = require('socket.io')(http)
 
 let socketList = {}
-let usernameList = {}
+let mapSocketIdToUsername = {}
 let roomList = {}
 let roomIndexNow = 0
 
@@ -30,30 +30,40 @@ io.on('connection', socket => {
   console.log(socket.id, 'connected')
   socketList[socket.id] = socket
 
+  socket.on('setUsername', username => {
+    mapSocketIdToUsername[socket.id] = username
+  })
+
+  socket.on('getAllRooms', () => {
+    console.log('getAllRooms')
+    const rooms = Object.keys(roomList)
+    socket.emit('roomUpdateAll', rooms)
+  })
+
   socket.on('createRoom', () => {
     console.log('createRoom')
     const roomName = createRoom(socket.id)
-    io.emit('roomCreated', { roomName })
+    io.emit('roomUpdate', roomName)
   })
 
-  socket.on('reqRooms', () => {
-    console.log('reqRooms')
-    const rooms = Object.keys(roomList)
-    socket.emit('resRooms', { rooms })
-  })
-
-  socket.on('joinRoom', (roomName, username) => {
+  socket.on('joinRoom', roomName => {
     socket.join(roomName)
-    socket.to(roomName).emit('someoneJoinRoom', { username })
-    socket.emit('joinedRoom', { roomName })
+    socket.to(roomName).emit('someoneJoinRoom', username)
+    socket.emit('joinedRoom', roomName)
+  })
+
+  socket.on('leaveRoom', roomName => {
+    socket.leave(roomName)
+    socket.to(roomName).emit('someoneLeaveRoom', username)
+    socket.emit('leavedRoom', roomName)
   })
 
   socket.on('disconnect', () => {
     delete socketList[socket.id]
+    socket.removeAllListeners()
     console.log(socket.id, 'disconnected')
   })
 })
 
-//
 server.listen(3001, () => console.log('listening on port 3001'))
 // const io = require('socket.io').listen(server)
