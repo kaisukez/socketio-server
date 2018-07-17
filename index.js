@@ -12,10 +12,10 @@ let roomIndexNow = 0
 
 createRoom = roomHeaderSocketId => {
   roomIndexNow++
-  const roomName = roomIndexNow.toString(36)
+  const roomId = roomIndexNow.toString(36)
   const boardState = Array(8).fill('').map(a => Array(8).fill(false))
-  roomList[roomName] = { roomHeaderSocketId, boardState }
-  return roomName
+  roomList[roomId] = { roomHeaderSocketId, boardState }
+  return roomId
 };
 
 app.get('/', (req, res) => {
@@ -42,20 +42,28 @@ io.on('connection', socket => {
 
   socket.on('createRoom', () => {
     console.log('createRoom')
-    const roomName = createRoom(socket.id)
-    io.emit('roomUpdate', roomName)
+    const roomId = createRoom(socket.id)
+    io.emit('roomUpdate', roomId)
   })
 
-  socket.on('joinRoom', roomName => {
-    socket.join(roomName)
-    socket.to(roomName).emit('someoneJoinRoom', username)
-    socket.emit('joinedRoom', roomName)
+  socket.on('joinRoom', roomId => {
+    socket.join(roomId)
+    socket.to(roomId).emit('someoneJoinRoom', mapSocketIdToUsername[socket.id])
+    socket.emit('joinedRoom', roomId)
   })
 
-  socket.on('leaveRoom', roomName => {
-    socket.leave(roomName)
-    socket.to(roomName).emit('someoneLeaveRoom', username)
-    socket.emit('leavedRoom', roomName)
+  socket.on('getBoardState', () => {
+
+  })
+
+  socket.on('move', position => {
+    socket.to(roomId).emit('moved', position)
+  })
+
+  socket.on('leaveRoom', roomId => {
+    socket.leave(roomId)
+    socket.to(roomId).emit('someoneLeaveRoom', username)
+    socket.emit('leavedRoom', roomId)
   })
 
   socket.on('disconnect', () => {
