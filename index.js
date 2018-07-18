@@ -8,24 +8,29 @@ const io = require('socket.io').listen(server)
 let socketList = {}
 let mapSocketIdToUsername = {}
 let mapSocketIdToRoomId = {}
-let roomList = {}
+let rooms = {}
 let roomIndexNow = 0
 
-createRoom = roomHeaderSocketId => {
+const roomState = {
+  WAITING_FOR_OPPONENT: 'WAITING_FOR_OPPONENT',
+  PLAYING: 'PLAYING',
+  FINISHED: 'FINISHED'
+}
+
+createRoom = ownerSokcetId => {
   roomIndexNow++
   const roomId = roomIndexNow.toString(36)
+  const opponentSocketId = null
+  const viewerSocketIds = []
   const boardState = Array(8).fill('').map(a => Array(8).fill(false))
-  roomList[roomId] = { roomHeaderSocketId, boardState }
+  rooms[roomId] = {
+    ownerSocketId,
+    opponentSocketId,
+    viewerSocketIds,
+    boardState
+  }
   return roomId
-};
-
-app.get('/', (req, res) => {
-  return res.send('hello world!')
-})
-
-app.get('/get_all_rooms', (req, res) => {
-  return roomList
-})
+}
 
 io.on('connection', socket => {
   console.log(socket.id, 'connected')
@@ -36,7 +41,7 @@ io.on('connection', socket => {
   })
 
   socket.on('getAllRooms', () => {
-    const rooms = Object.keys(roomList)
+    const rooms = Object.keys(rooms)
     socket.emit('roomUpdateAll', rooms)
   })
 
@@ -56,12 +61,12 @@ io.on('connection', socket => {
   socket.on('leaveRoom', roomId => {
     socket.leave(roomId)
     delete mapSocketIdToRoomId[socket.id]
-    socket.to(roomId).emit('someoneLeaveRoom', mapSocketIdToRoomId[socket.id])
+    socket.to(roomId).emit('someoneLeaveRoom', mapSocketIdToUsername[socket.id])
     socket.emit('leavedRoom', roomId)
   })
 
   socket.on('getBoardState', () => {
-    socket.emit('updateWholeBoardState', roomList[mapSocketIdToRoomId[socket.id]].boardState)
+    socket.emit('updateWholeBoardState', rooms[mapSocketIdToRoomId[socket.id]].boardState)
   })
 
   socket.on('move', position => {
