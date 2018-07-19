@@ -11,13 +11,31 @@ let mapSocketIdToRoomId = {}
 let rooms = {}
 let roomIndexNow = 0
 
-const roomState = {
+const ROOM_STATE = {
   WAITING_FOR_OPPONENT: 'WAITING_FOR_OPPONENT',
   PLAYING: 'PLAYING',
   FINISHED: 'FINISHED'
 }
 
-createRoom = ownerSokcetId => {
+const PLAYER_STATUS = {
+  OWNER: 'OWNER',
+  OPPONENT: 'OPPONENT',
+  VIEWER: 'VIEWER',
+  OUTSIDER: 'OUTSIDER'
+}
+
+const getPlayerStatus = (roomId, socketId) => {
+  const room = rooms[roomId]
+  if (socketId === room.ownerSocketId)
+    return PLAYER_STATUS.OWNER
+  else if (socketId === room.opponentSocketId)
+    return PLAYER_STATUS.OPPONENT
+  else if (room.viewerSocketIds.indexOf(socketId) != -1)
+    return PLAYER_STATUS.VIEWER
+  return PLAYER_STATUS.OUTSIDER
+}
+
+const createRoom = ownerSocketId => {
   roomIndexNow++
   const roomId = roomIndexNow.toString(36)
   const opponentSocketId = null
@@ -29,7 +47,27 @@ createRoom = ownerSokcetId => {
     viewerSocketIds,
     boardState
   }
-  return roomId
+  return { roomId, playerStatus: PLAYER_STATUS.OWNER }
+}
+
+const joinRoom = (roomId, socketId) => {
+  if (rooms[roomId].opponentSocketId === null) {
+    rooms[roomId].opponentSocketId = socketId
+    mapSocketIdToRoomId[socketId] = roomId
+    return { playerStatus: PLAYER_STATUS.OPPONENT }
+  } else {
+    rooms[roomId].viewerSocketIds.push(socketId)
+    mapSocketIdToRoomId[socketId] = roomId
+    return { playerStatus: PLAYER_STATUS.VIEWER }
+  }
+}
+
+const leaveRoom = (roomId, socketId) => {
+  if (socketId === rooms[roomId].ownerSocketId) {
+    rooms[roomId].ownerSocketId = null
+  } else if (socketId === rooms[roomId].opponentSockedId) {
+    rooms[roomId].opponentSocketId = null
+  }
 }
 
 io.on('connection', socket => {
@@ -41,28 +79,32 @@ io.on('connection', socket => {
   })
 
   socket.on('getAllRooms', () => {
-    const rooms = Object.keys(rooms)
-    socket.emit('roomUpdateAll', rooms)
+    const roomNames = Object.keys(rooms)
+    socket.emit('roomUpdateAll', roomNames)
   })
 
   socket.on('createRoom', () => {
-    const roomId = createRoom(socket.id)
+    const { roomId, playerStatus } = createRoom(socket.id)
+    socket.join(roomId)
+    socket.emit('playerStatus', roomId, playerStatus)
     io.emit('roomUpdate', roomId)
-    socket.emit('roomCreated', roomId)
   })
 
   socket.on('joinRoom', roomId => {
+    const { playerStatus } = joinRoom(roomId, socket.id)
     socket.join(roomId)
-    mapSocketIdToRoomId[socket.id] = roomId
+    socket.emit('playerStatus', roomId, playerStatus)
     socket.to(roomId).emit('someoneJoinRoom', mapSocketIdToUsername[socket.id])
-    socket.emit('joinedRoom', roomId)
   })
 
   socket.on('leaveRoom', roomId => {
+
     socket.leave(roomId)
     delete mapSocketIdToRoomId[socket.id]
-    socket.to(roomId).emit('someoneLeaveRoom', mapSocketIdToUsername[socket.id])
+
     socket.emit('leavedRoom', roomId)
+    socket.to(roomId).emit('someoneLeaveRoom', mapSocketIdToUsername[socket.id])
+    rooms[roomId]
   })
 
   socket.on('getBoardState', () => {
